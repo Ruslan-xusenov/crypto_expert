@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title>Kripto-Ekspert | Matnlarni xavfsiz shifrlash va deshifrlash</title>
+    <meta name="title" content="Kripto-Ekspert | Matnlarni xavfsiz shifrlash va deshifrlash" />
+    <meta name="description" content="Kripto-Ekspert - matnlarni Base64, Sezar (Caesar), Vigenère, XOR va ROT13 usullari yordamida tez va xavfsiz shifrlash hamda deshifrlash uchun bepul onlayn vosita. Barcha jarayonlar brauzerda amalga oshiriladi." />
+    <meta name="keywords" content="shifrlash, deshifrlash, kriptografiya, xavfsizlik, base64, sezar shifri, vigenere, xor, rot13, onlayn shifrlash, o'zbek tilida, matnni himoyalash, kripto-ekspert" />
+    <meta name="author" content="Ruslan Xusenov" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="Uzbek" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ruslandev.uz/" />
+    <meta property="og:title" content="Kripto-Ekspert | Matnlarni xavfsiz shifrlash va deshifrlash" />
+    <meta property="og:description" content="Kripto-Ekspert yordamida matnlarni turli xil kriptografik usullar orqali shifrlang va deshifrlang. Hech qanday ma'lumot serverga yuborilmaydi!" />
+    <meta property="og:image" content="https://ruslandev.uz/preview.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://ruslandev.uz/" />
+    <meta property="twitter:title" content="Kripto-Ekspert | Matnlarni xavfsiz shifrlash" />
+    <meta property="twitter:description" content="Matnlarni Base64, Sezar, Vigenère, XOR va ROT13 yordamida shifrlash uchun xavfsiz onlayn vosita." />
+    <meta property="twitter:image" content="https://ruslandev.uz/preview.png" />
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                        'slide-in-top': 'slideInTop 0.3s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideInTop: {
+                            '0%': { transform: 'translateY(-10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, .font-heading { font-family: 'Outfit', sans-serif; }
+        .animate-in {
+            animation-duration: 0.3s;
+            animation-fill-mode: both;
+        }
+        .fade-in { animation-name: fadeIn; }
+        .slide-in-from-top-2 { animation-name: slideInTop; }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <!-- React and Dependencies -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Lucide for React -->
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { 
+            Shield, 
+            Lock, 
+            Unlock, 
+            Copy, 
+            Key, 
+            RefreshCcw, 
+            AlertCircle, 
+            CheckCircle2,
+            Trash2,
+            Settings2
+        } = lucideReact;
+
+        function App() {
+            const [inputText, setInputText] = useState('');
+            const [outputText, setOutputText] = useState('');
+            const [method, setMethod] = useState('base64');
+            const [secretKey, setSecretKey] = useState('');
+            const [error, setError] = useState('');
+            const [copied, setCopied] = useState(false);
+
+            const methods = [
+                { id: 'base64', name: 'Base64 kodlash', needsKey: false, desc: 'Matnni standart Base64 formatiga o\'tkazish.' },
+                { id: 'caesar', name: 'Sezar shifri (Caesar)', needsKey: true, keyType: 'number', placeholder: 'Siljish miqdori (raqam, masalan: 3)', desc: 'Belgilarni ma\'lum raqamga siljitish.' },
+                { id: 'vigenere', name: 'Vigenère shifri', needsKey: true, keyType: 'text', placeholder: 'Maxfiy so\'z', desc: 'Maxfiy kalit so\'z yordamida polialfavit shifrlash.' },
+                { id: 'xor', name: 'XOR + Base64', needsKey: true, keyType: 'text', placeholder: 'Maxfiy kalit so\'z', desc: 'XOR amali va maxfiy kalit yordamida kuchli shifrlash.' },
+                { id: 'rot13', name: 'ROT13', needsKey: false, desc: 'Lotin harflarini 13 o\'ringa siljitish (faqat ingliz harflari uchun).' }
+            ];
+
+            const currentMethod = methods.find(m => m.id === method);
+
+            const utoa = (str) => {
+                try { return window.btoa(unescape(encodeURIComponent(str))); } 
+                catch (e) { throw new Error("Base64 kodlashda xatolik."); }
+            };
+            const atou = (str) => {
+                try { return decodeURIComponent(escape(window.atob(str))); } 
+                catch (e) { throw new Error("Noto'g'ri Base64 formati."); }
+            };
+
+            const base64Encrypt = (text) => utoa(text);
+            const base64Decrypt = (text) => atou(text);
+
+            const caesarEncrypt = (text, shiftStr) => {
+                const shift = parseInt(shiftStr) || 0;
+                let shifted = '';
+                for (let i = 0; i < text.length; i++) {
+                    shifted += String.fromCharCode((text.charCodeAt(i) + shift) % 65536);
+                }
+                return utoa(shifted);
+            };
+            const caesarDecrypt = (text, shiftStr) => {
+                const shift = parseInt(shiftStr) || 0;
+                let unshifted = '';
+                const decoded = atou(text);
+                for (let i = 0; i < decoded.length; i++) {
+                    unshifted += String.fromCharCode((decoded.charCodeAt(i) - shift + 65536) % 65536);
+                }
+                return unshifted;
+            };
+
+            const vigenereEncrypt = (text, key) => {
+                if (!key) throw new Error("Maxfiy kalit kiritilmagan!");
+                let shifted = '';
+                for (let i = 0; i < text.length; i++) {
+                    const shift = key.charCodeAt(i % key.length);
+                    shifted += String.fromCharCode((text.charCodeAt(i) + shift) % 65536);
+                }
+                return utoa(shifted);
+            };
+            const vigenereDecrypt = (text, key) => {
+                if (!key) throw new Error("Maxfiy kalit kiritilmagan!");
+                const decoded = atou(text);
+                let unshifted = '';
+                for (let i = 0; i < decoded.length; i++) {
+                    const shift = key.charCodeAt(i % key.length);
+                    unshifted += String.fromCharCode((decoded.charCodeAt(i) - shift + 65536) % 65536);
+                }
+                return unshifted;
+            };
+
+            const xorEncrypt = (text, key) => {
+                if (!key) throw new Error("Maxfiy kalit kiritilmagan!");
+                let result = '';
+                for (let i = 0; i < text.length; i++) {
+                    result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+                }
+                return utoa(result);
+            };
+            const xorDecrypt = (text, key) => {
+                if (!key) throw new Error("Maxfiy kalit kiritilmagan!");
+                const decoded = atou(text);
+                let result = '';
+                for (let i = 0; i < decoded.length; i++) {
+                    result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+                }
+                return result;
+            };
+
+            const rot13Func = (text) => {
+                return text.replace(/[a-zA-Z]/g, (c) => {
+                    const base = c <= 'Z' ? 65 : 97;
+                    return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);
+                });
+            };
+
+            const processText = (action) => {
+                setError('');
+                setOutputText('');
+                
+                if (!inputText.trim()) {
+                    setError("Iltimos, ishlov berish uchun matn kiriting!");
+                    return;
+                }
+
+                try {
+                    let result = '';
+                    
+                    switch (method) {
+                        case 'base64':
+                            result = action === 'encrypt' ? base64Encrypt(inputText) : base64Decrypt(inputText);
+                            break;
+                        case 'caesar':
+                            result = action === 'encrypt' ? caesarEncrypt(inputText, secretKey) : caesarDecrypt(inputText, secretKey);
+                            break;
+                        case 'vigenere':
+                            result = action === 'encrypt' ? vigenereEncrypt(inputText, secretKey) : vigenereDecrypt(inputText, secretKey);
+                            break;
+                        case 'xor':
+                            result = action === 'encrypt' ? xorEncrypt(inputText, secretKey) : xorDecrypt(inputText, secretKey);
+                            break;
+                        case 'rot13':
+                            result = rot13Func(inputText);
+                            break;
+                        default:
+                            throw new Error("Noma'lum usul tanlandi.");
+                    }
+                    
+                    setOutputText(result);
+                } catch (err) {
+                    setError(err.message || "Xatolik yuz berdi. Matn yoki kalit to'g'riligini tekshiring.");
+                }
+            };
+
+            const copyToClipboard = () => {
+                if (!outputText) return;
+                navigator.clipboard.writeText(outputText).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                }).catch(() => {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = outputText;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                    } catch (err) {
+                        setError("Nusxa olishda xatolik yuz berdi.");
+                    }
+                    document.body.removeChild(textArea);
+                });
+            };
+
+            const clearAll = () => {
+                setInputText('');
+                setOutputText('');
+                setError('');
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 font-sans">
+                    <header className="max-w-5xl mx-auto flex items-center gap-3 mb-8 pb-4 border-b border-slate-200">
+                        <div className="bg-indigo-600 p-3 rounded-xl text-white shadow-lg shadow-indigo-200">
+                            <Shield size={28} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight font-heading">Kripto-Ekspert</h1>
+                            <p className="text-sm text-slate-500 font-medium">Matnlarni xavfsiz shifrlash va deshifrlash</p>
+                        </div>
+                    </header>
+
+                    <main className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-5 flex flex-col gap-4">
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col transition-all focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-400">
+                                <div className="flex justify-between items-center mb-3">
+                                    <label className="font-semibold text-slate-700 flex items-center gap-2">
+                                        Asl matn
+                                        <span className="text-xs font-normal bg-slate-100 px-2 py-1 rounded-md text-slate-500">
+                                            {inputText.length} belgi
+                                        </span>
+                                    </label>
+                                    {inputText && (
+                                        <button 
+                                            onClick={clearAll}
+                                            className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                            title="Tozalash"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                                <textarea
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                    placeholder="Shifrlash yoki deshifrlash uchun matnni bu yerga kiriting..."
+                                    className="w-full flex-1 min-h-[300px] resize-none outline-none text-slate-700 placeholder-slate-400 bg-transparent"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2 flex flex-col justify-center gap-4">
+                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                                        <Settings2 size={16} className="text-indigo-500"/>
+                                        Kodlash usuli
+                                    </label>
+                                    <select
+                                        value={method}
+                                        onChange={(e) => {
+                                            setMethod(e.target.value);
+                                            setSecretKey('');
+                                            setError('');
+                                        }}
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
+                                    >
+                                        {methods.map(m => (
+                                            <option key={m.id} value={m.id}>{m.name}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[11px] text-slate-500 leading-tight mt-1">
+                                        {currentMethod?.desc}
+                                    </p>
+                                </div>
+
+                                {currentMethod?.needsKey && (
+                                    <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
+                                        <label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                                            <Key size={16} className="text-amber-500"/>
+                                            Kalit
+                                        </label>
+                                        <input
+                                            type={currentMethod.keyType === 'number' ? 'number' : 'text'}
+                                            value={secretKey}
+                                            onChange={(e) => setSecretKey(e.target.value)}
+                                            placeholder={currentMethod.placeholder}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="h-px bg-slate-100 my-2"></div>
+
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        onClick={() => processText('encrypt')}
+                                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl font-medium transition-all active:scale-[0.98] shadow-sm hover:shadow-indigo-200 shadow-md"
+                                    >
+                                        <Lock size={18} />
+                                        Shifrlash
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => processText('decrypt')}
+                                        className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white p-3 rounded-xl font-medium transition-all active:scale-[0.98] shadow-sm"
+                                    >
+                                        <Unlock size={18} />
+                                        Deshifrlash
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-5 flex flex-col gap-4">
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col relative overflow-hidden">
+                                {error && (
+                                    <div className="absolute top-0 left-0 right-0 bg-red-50 text-red-600 text-sm p-3 flex items-center gap-2 border-b border-red-100 animate-in fade-in slide-in-from-top-2">
+                                        <AlertCircle size={16} className="shrink-0" />
+                                        <span className="font-medium">{error}</span>
+                                    </div>
+                                )}
+
+                                <div className={`flex justify-between items-center mb-3 ${error ? 'mt-10' : ''} transition-all`}>
+                                    <label className="font-semibold text-slate-700">Natija</label>
+                                    <button
+                                        onClick={copyToClipboard}
+                                        disabled={!outputText}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                            outputText 
+                                                ? copied 
+                                                    ? 'bg-green-100 text-green-700' 
+                                                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                                                : 'bg-slate-50 text-slate-400 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+                                        {copied ? "Nusxa olindi" : "Nusxa olish"}
+                                    </button>
+                                </div>
+                                
+                                <textarea
+                                    readOnly
+                                    value={outputText}
+                                    placeholder="Natija bu yerda ko'rinadi..."
+                                    className="w-full flex-1 min-h-[300px] resize-none outline-none text-slate-800 placeholder-slate-300 bg-transparent font-mono text-sm leading-relaxed"
+                                />
+                                
+                                {!outputText && !error && (
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center flex-col gap-3 text-slate-300 mt-8">
+                                        <RefreshCcw size={48} strokeWidth={1} className="opacity-50" />
+                                        <p className="text-sm font-medium">Jarayon kutilmoqda</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </main>
+                    
+                    <footer className="max-w-5xl mx-auto mt-12 text-center text-slate-400 text-sm">
+                        <p>Ushbu vosita brauzerning o'zida ishlaydi. Hech qanday ma'lumot serverga yuborilmaydi.</p>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
